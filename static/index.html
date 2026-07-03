@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>Books RAG — 读书助手</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/marked@15.0.7/marked.min.js"></script>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div id="build-ver">v1531</div>
+<div id="app">
+  <div id="overlay"></div>
+
+  <!-- SIDEBAR -->
+  <aside id="sidebar">
+    <div class="sidebar-top">
+      <div class="brand">
+        <div class="brand-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>
+        </div>
+        <div class="brand-text">
+          <span class="brand-title">Books</span>
+          <span class="brand-sub">RAG</span>
+        </div>
+      </div>
+      <button id="sidebar-close" class="btn-icon" aria-label="关闭侧边栏">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+
+    <button id="new-chat-btn" onclick="S.cid=null;location.reload();return false;">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+      <span>新对话</span>
+    </button>
+
+    <div id="conv-section" class="sidebar-section">
+      <div class="section-label" style="display:flex;justify-content:space-between;align-items:center">
+        <span>对话历史</span>
+        <button id="clear-convs-btn" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:10px;padding:2px 6px;border-radius:4px;font-family:inherit;transition:color .15s" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color=''">清空</button>
+      </div>
+      <div id="conv-list"></div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="section-label">知识库</div>
+      <div id="book-list"></div>
+    </div>
+    <div class="sidebar-section" style="margin-top:auto;border-top:1px solid rgba(255,255,255,.06);padding:10px 16px">
+      <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--sidebar-text)">
+        <span>⭐ 精选问答</span>
+        <span id="curated-count" style="font-size:10px;background:rgba(245,158,11,.2);color:var(--brand);padding:1px 6px;border-radius:4px">0</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main id="main">
+    <header id="topbar">
+      <div class="topbar-left">
+        <button id="menu-btn" class="btn-icon" aria-label="菜单">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+        </button>
+        <div class="topbar-title">
+          <h1>读书助手</h1>
+          <span id="mode-badge" class="mode-search">检索模式</span>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <select id="model-select" class="model-select">
+          <option value="deepseek">DeepSeek V4</option>
+          <option value="longcat">LongCat 2.0</option>
+        </select>
+        <span id="status-dot" class="dot-ready"></span>
+        <span id="status-text">就绪</span>
+        <button id="theme-btn" class="btn-icon" aria-label="切换主题">
+          <svg class="sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+          <svg class="moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <div id="messages">
+      <!-- 欢迎 -->
+      <div id="welcome">
+        <div class="welcome-icon">
+          <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/><path d="M8 7h6M8 11h8"/></svg>
+        </div>
+        <h2 class="welcome-title">你想探索哪本书？</h2>
+        <p class="welcome-desc">输入任何问题，从 8 本经典中检索相关段落</p>
+        <div class="welcome-grid">
+          <button class="prompt-chip" data-q="Die with Zero 的核心思想是什么？">
+            <span>🎯</span> Die with Zero
+          </button>
+          <button class="prompt-chip" data-q="如何克服冒充者综合征？">
+            <span>💪</span> 自信的力量
+          </button>
+          <button class="prompt-chip" data-q="斯多葛学派如何看待挫折？">
+            <span>🛡️</span> 斯多葛挑战
+          </button>
+          <button class="prompt-chip" data-q="Status Anxiety 中的自尊公式是什么？">
+            <span>📊</span> 身份焦虑
+          </button>
+          <button class="prompt-chip" data-q="什么是记忆红利？">
+            <span>🧠</span> 记忆红利
+          </button>
+          <button class="prompt-chip" data-q="建立融洽关系的核心要素是什么？">
+            <span>🤝</span> 人际关系
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div id="input-area">
+      <div class="input-box">
+        <textarea id="input" rows="1" placeholder="输入你的问题……"></textarea>
+        <button id="send-btn" disabled>
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+        </button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+// === state ===
+const S = { cid: null, mode: 'search' };
+
+const $ = s => document.querySelector(s);
+const $$ = s => document.querySelectorAll(s);
+const msgBox = $('#messages');
+const input = $('#input');
+const send = $('#send-btn');
+const statusDot = $('#status-dot');
+const statusText = $('#status-text');
+const modeBadge = $('#mode-badge');
+const sidebar = $('#sidebar');
+const overlay = $('#overlay');
+
+// === 获取运行模式 + 当前模型 ===
+(async () => {
+  try {
+    const r = await fetch('/api/health');
+    const d = await r.json();
+    S.mode = d.mode;
+    modeBadge.textContent = d.mode === 'llm' ? 'LLM 模式' : '检索模式';
+    modeBadge.className = d.mode === 'llm' ? 'mode-llm' : 'mode-search';
+    if (d.provider) $('#model-select').value = d.provider;
+  } catch(e) {}
+})();
+
+// === 模型切换 ===
+$('#model-select').onchange = async () => {
+  const provider = $('#model-select').value;
+  const oldLabel = $('#model-select').options[$('#model-select').selectedIndex].text;
+  try {
+    const r = await fetch('/api/model/switch', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({provider}),
+    });
+    const d = await r.json();
+    if (d.model) setStatus('已切换: ' + d.model);
+    else setStatus('切换失败', 'err');
+  } catch(e) {
+    setStatus('切换失败', 'err');
+  }
+};
+
+// === theme ===
+const html = document.documentElement;
+const saved = localStorage.getItem('theme');
+if (saved) html.setAttribute('data-theme', saved);
+else if (window.matchMedia('(prefers-color-scheme:dark)').matches) html.setAttribute('data-theme', 'dark');
+
+$('#theme-btn').onclick = () => {
+  const d = html.getAttribute('data-theme') === 'dark';
+  html.setAttribute('data-theme', d ? 'light' : 'dark');
+  localStorage.setItem('theme', d ? 'light' : 'dark');
+};
+
+// === sidebar ===
+$('#menu-btn').onclick = () => { sidebar.classList.add('open'); overlay.classList.add('show'); };
+$('#sidebar-close').onclick = closeSidebar;
+overlay.onclick = closeSidebar;
+function closeSidebar() { sidebar.classList.remove('open'); overlay.classList.remove('show'); }
+
+// === load books ===
+(async () => {
+  try {
+    const r = await fetch('/api/books');
+    const books = await r.json();
+    const colors = ['#8b5cf6','#06b6d4','#f59e0b','#10b981','#ef4444','#ec4899','#6366f1','#14b8a6'];
+    $('#book-list').innerHTML = books.map((b,i) =>
+      `<div class="book-shelf">
+        <div class="book-spine" style="background:${colors[i%colors.length]}"></div>
+        <div class="book-meta">${b.title||b.id} · ${b.chapter_count} 章</div>
+      </div>`
+    ).join('');
+  } catch(e) {}
+})();
+
+// === conversations ===
+async function loadConvs() {
+  try {
+    const r = await fetch('/api/conversations');
+    const list = await r.json();
+    const el = $('#conv-list');
+    if (!list.length) { el.innerHTML = '<div class="conv-empty">暂无对话</div>'; return; }
+    el.innerHTML = list.map(c =>
+      `<div class="conv-row ${c.conversation_id===S.cid?'active':''}" data-id="${c.conversation_id}">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <span class="conv-label">${esc(c.last_query||'新对话')}</span>
+        <button class="conv-del" data-id="${c.conversation_id}">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>`
+    ).join('');
+    el.querySelectorAll('.conv-row').forEach(el => el.onclick = e => {
+      if (e.target.closest('.conv-del')) return;
+      S.cid = el.dataset.id;
+      loadConversationMessages(S.cid);
+      closeSidebar(); loadConvs();
+    });
+
+    el.querySelectorAll('.conv-del').forEach(btn => btn.onclick = async e => {
+      e.stopPropagation();
+      await fetch(`/api/conversations/${btn.dataset.id}`,{method:'DELETE'});
+      if (S.cid === btn.dataset.id) { S.cid = null; showWelcome(); }
+      loadConvs();
+    });
+  } catch(e) {}
+}
+
+async function loadConversationMessages(cid) {
+  try {
+    const r = await fetch(`/api/conversations/${cid}`);
+    const msgs = await r.json();
+    msgBox.innerHTML = '';
+    let lastQuestion = '';
+    for (const m of msgs) {
+      const div = document.createElement('div');
+      div.className = `msg msg-${m.role}`;
+      const avatar = m.role === 'user'
+        ? '<div class="msg-avatar user-av"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>'
+        : '<div class="msg-avatar ai-av"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z"/><path d="M7 7h.01"/></svg></div>';
+      const contentHtml = m.role === 'assistant' ? marked.parse(m.content,{breaks:true}) : esc(m.content);
+      div.innerHTML = `${avatar}<div class="msg-bubble">${contentHtml}</div>`;
+
+      // 历史 AI 消息加上点赞按钮
+      if (m.role === 'assistant' && m.question) {
+        const bubble = div.querySelector('.msg-bubble');
+        const actionBar = document.createElement('div');
+        actionBar.className = 'action-bar';
+        const likeBtn = document.createElement('button');
+        const likeUn = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>`;
+        const likeOn = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>`;
+        likeBtn.className = 'like-btn';
+        likeBtn.innerHTML = likeUn;
+        likeBtn.dataset.q = m.question;
+        likeBtn.dataset.a = m.content;
+        likeBtn.dataset.sb = (m.source_books||[]).join(',');
+        likeBtn.title = '点赞/取消';
+        likeBtn.dataset.role = 'like';
+        // 异步检查历史点赞状态（不与事件委托冲突）
+        (async()=>{
+          try {
+            var ch=await fetch('/api/feedback/check',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:likeBtn.dataset.q,answer:likeBtn.dataset.a})});
+            var cd=await ch.json();
+            if(cd.liked){likeBtn.classList.add('liked');likeBtn.innerHTML=likeOn;}
+          } catch(e){}
+        })();
+        actionBar.appendChild(likeBtn);
+
+        // 复制按钮
+        const copyBtn = document.createElement('button');
+        copyBtn.className = 'copy-btn';
+        copyBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
+        copyBtn.title = '复制回答';
+        copyBtn.onclick = () => {
+          const text = m.content;
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(() => done()).catch(() => fallback(text));
+          } else {
+            fallback(text);
+          }
+          function done() {
+            copyBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg>`;
+            setTimeout(() => {
+              copyBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
+            }, 2000);
+          }
+          function fallback(t) {
+            const ta = document.createElement('textarea');
+            ta.value = t; ta.style.position='fixed'; ta.style.left='-9999px';
+            document.body.appendChild(ta); ta.select();
+            try { document.execCommand('copy'); done(); } catch(e) {}
+            document.body.removeChild(ta);
+          }
+        };
+        copyBtn.style.marginLeft = 'auto';
+        actionBar.appendChild(copyBtn);
+
+        bubble.appendChild(actionBar);
+      }
+
+      if (m.role === 'user') lastQuestion = m.content;
+      msgBox.appendChild(div);
+    }
+    msgBox.scrollTop = msgBox.scrollHeight;
+  } catch(e) {
+    msgBox.innerHTML = '<div class="resume-banner">无法加载历史消息</div>';
+  }
+}
+
+
+var clearBtn = document.getElementById('clear-convs-btn');
+if (clearBtn) clearBtn.onclick = async function(){ if (!confirm('确定清空所有对话？')) return; await fetch('/api/conversations', {method:'DELETE'}); S.cid = null; msgBox.innerHTML = document.getElementById('welcome').outerHTML; bindChips(); loadConvs(); var cc = document.getElementById('curated-count'); if(cc) cc.textContent='0'; };
+function showWelcome() { msgBox.innerHTML = $('#welcome').outerHTML; bindChips(); }
+
+// === send ===
+send.onclick = sendMsg;
+input.onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg(); } };
+input.oninput = () => {
+  send.disabled = !input.value.trim();
+  input.style.height = 'auto';
+  input.style.height = Math.min(input.scrollHeight, 150)+'px';
+};
+
+function setStatus(s, type) {
+  statusText.textContent = s;
+  statusDot.className = type === 'busy' ? 'dot-busy' : type === 'err' ? 'dot-err' : 'dot-ready';
+}
+
+async function sendMsg() {
+  const q = input.value.trim();
+  if (!q) return;
+  const wel = msgBox.querySelector('#welcome'); if (wel) wel.remove();
+  const ban = msgBox.querySelector('.resume-banner'); if (ban) ban.remove();
+
+  addMsg('user', q);
+  input.value = ''; send.disabled = true; input.style.height = 'auto';
+
+  // 用流式加载气泡
+  const msgEl = document.createElement('div');
+  msgEl.className = 'msg msg-ai';
+  msgEl.innerHTML = `<div class="msg-avatar ai-av"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z"/><path d="M7 7h.01"/></svg></div>
+    <div class="msg-bubble"><span class="stream-cursor">▍</span></div>`;
+  msgBox.appendChild(msgEl);
+  msgBox.scrollTop = msgBox.scrollHeight;
+
+  const bubble = msgEl.querySelector('.msg-bubble');
+  const cursor = bubble.querySelector('.stream-cursor');
+  let answer = '';
+  let sourceList = [];
+  let statusEl = null;
+
+  try {
+    const r = await fetch('/api/chat/stream', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({query:q, conversation_id:S.cid}),
+    });
+    if (!r.ok) throw new Error('HTTP '+r.status);
+
+    const reader = r.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+
+    while (true) {
+      const {done, value} = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, {stream:true});
+
+      const lines = buf.split('\n');
+      buf = lines.pop() || '';
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const evt = JSON.parse(line.slice(6));
+
+        switch (evt.type) {
+          case 'conv':
+            S.cid = evt.id;
+            break;
+          case 'status':
+            if (cursor) cursor.textContent = '▍';
+            // 显示进度提示
+            if (!statusEl) {
+              statusEl = document.createElement('div');
+              statusEl.className = 'stream-status';
+              bubble.insertBefore(statusEl, cursor);
+            }
+            statusEl.textContent = '⏳ ' + evt.text;
+            break;
+          case 'sources':
+            sourceList = evt.sources;
+            if (statusEl) statusEl.remove();
+            statusEl = null;
+            break;
+          case 'token':
+            if (statusEl) { statusEl.remove(); statusEl = null; }
+            if (cursor) cursor.remove();
+            answer += evt.text;
+            bubble.innerHTML = marked.parse(answer, {breaks:true});
+            break;
+        }
+        msgBox.scrollTop = msgBox.scrollHeight;
+      }
+    }
+    if (cursor) cursor.remove();
+    if (statusEl) statusEl.remove();
+
+    // 当前回答的数据（流式完成后答案才完整）
+    const qaRecord = { question: q, answer: answer, source_books: sourceList.map(s => s.book) };
+
+    // 来源 + 操作按钮
+    const actionBar = document.createElement('div');
+    actionBar.className = 'action-bar';
+
+    if (sourceList.length) {
+      const sb = document.createElement('span');
+      sb.className = 'sources';
+      sb.innerHTML = `<button class="src-btn">📖 ${sourceList.length} 个来源</button>
+        <div class="src-body hidden">${
+          sourceList.map(s => `<div class="src-row">
+            <span class="src-book">${esc(s.book)}</span>
+            <span class="src-ch">${esc(s.chapter)}</span>
+            <span class="src-sc">${s.score}</span>
+          </div>`).join('')
+        }</div>`;
+      sb.querySelector('.src-btn').onclick = () => sb.querySelector('.src-body').classList.toggle('hidden');
+      actionBar.appendChild(sb);
+    }
+
+    // 点赞按钮（可切换）
+    const likeBtn = document.createElement('button');
+    likeBtn.className = 'like-btn';
+    const likeUn = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>`;
+    const likeOn = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>`;
+    likeBtn.innerHTML = likeUn;
+    likeBtn.title = '点赞/取消';
+    likeBtn.onclick = async () => {
+      likeBtn.classList.toggle('liked');
+      likeBtn.innerHTML = likeBtn.classList.contains('liked') ? likeOn : likeUn;
+      try {
+        const r = await fetch('/api/feedback/toggle', {
+          method: 'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify(qaRecord),
+        });
+        const d = await r.json();
+        var cc = document.getElementById('curated-count');
+        if(cc) cc.textContent = d.total;
+      } catch(e) { likeBtn.classList.toggle('liked'); likeBtn.innerHTML = likeBtn.classList.contains('liked') ? likeOn : likeUn; }
+    };
+    actionBar.appendChild(likeBtn);
+
+    // 复制按钮（用 dataset 存答案，避免闭包问题）
+    const copyBtn = document.createElement('button');
+    copyBtn.className = 'copy-btn';
+    copyBtn.dataset.answer = answer;
+    copyBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
+    copyBtn.title = '复制回答';
+    copyBtn.onclick = () => {
+      const text = copyBtn.dataset.answer;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => done()).catch(() => fallback(text));
+      } else {
+        fallback(text);
+      }
+      function done() {
+        copyBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg>`;
+        setTimeout(() => {
+          copyBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
+        }, 2000);
+      }
+      function fallback(t) {
+        const ta = document.createElement('textarea');
+        ta.value = t; ta.style.position='fixed'; ta.style.left='-9999px';
+        document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); done(); } catch(e) {}
+        document.body.removeChild(ta);
+      }
+    };
+    actionBar.appendChild(copyBtn);
+    bubble.appendChild(actionBar);
+
+    setStatus('就绪');
+    loadConvs();
+  } catch(e) {
+    cursor.textContent = '';
+    bubble.innerHTML = '<p><strong>请求失败</strong></p><p>请检查服务是否运行。</p>';
+    setStatus('出错', 'err');
+  }
+}
+
+function addMsg(role, content, sources) {
+  const el = document.createElement('div');
+  el.className = `msg msg-${role}`;
+  el.innerHTML = role === 'user'
+    ? `<div class="msg-avatar user-av"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
+       <div class="msg-bubble">${esc(content)}</div>`
+    : `<div class="msg-avatar ai-av"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z"/><path d="M7 7h.01"/></svg></div>
+       <div class="msg-bubble">${marked.parse(content,{breaks:true})}</div>`;
+
+  if (sources && sources.length) {
+    const sb = document.createElement('div');
+    sb.className = 'sources';
+    sb.innerHTML = `<button class="src-btn">📖 ${sources.length} 个来源</button>
+      <div class="src-body hidden">${
+        sources.map(s => `<div class="src-row">
+          <span class="src-book">${esc(s.book)}</span>
+          <span class="src-ch">${esc(s.chapter)}</span>
+          <span class="src-sc">${(1-s.score).toFixed(2)}</span>
+        </div>`).join('')
+      }</div>`;
+    sb.querySelector('.src-btn').onclick = () => sb.querySelector('.src-body').classList.toggle('hidden');
+    el.querySelector('.msg-bubble').appendChild(sb);
+  }
+  msgBox.appendChild(el);
+  msgBox.scrollTop = msgBox.scrollHeight;
+}
+
+function addLoader() {
+  const id = 'ld-'+Date.now();
+  const el = document.createElement('div');
+  el.className = 'msg msg-ai'; el.id = id;
+  el.innerHTML = `<div class="msg-avatar ai-av"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z"/><path d="M7 7h.01"/></svg></div>
+    <div class="msg-bubble"><span class="loader"></span></div>`;
+  msgBox.appendChild(el);
+  msgBox.scrollTop = msgBox.scrollHeight;
+  return id;
+}
+function rmLoader(id) { const e = document.getElementById(id); if(e) e.remove(); }
+
+function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+function bindChips() { $$('.prompt-chip').forEach(b => b.onclick = () => { input.value = b.dataset.q; input.dispatchEvent(new Event('input')); sendMsg(); }); }
+
+// === curated count ===
+(async () => {
+  try {
+    const r = await fetch('/api/feedback/count');
+    const d = await r.json();
+    $('#curated-count').textContent = d.count;
+  } catch(e) {}
+})();
+
+// === init ===
+bindChips();
+loadConvs();
+input.focus();
+
+// === 事件委托：点赞按钮（历史+新消息统一处理） ===
+document.querySelector('#messages').addEventListener('click', async function(e) {
+  var btn = e.target.closest('.like-btn');
+  if (!btn || !btn.dataset.role) return;
+
+  // 超明显反馈：红色边框闪一下（证明事件被触发了）
+  btn.style.outline = '3px solid red';
+  btn.style.outlineOffset = '2px';
+  setTimeout(function(){ btn.style.outline = ''; }, 800);
+
+  // 立即视觉反馈：闪一下
+  btn.style.transition = 'opacity .15s';
+  btn.style.opacity = '0.3';
+  setTimeout(function(){ btn.style.opacity = ''; }, 200);
+
+  var likeOn = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>`;
+  var likeUn = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>`;
+
+  try {
+    var resp = await fetch('/api/feedback/toggle', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        question: btn.dataset.q,
+        answer: btn.dataset.a,
+        source_books: btn.dataset.sb ? btn.dataset.sb.split(',') : []
+      })
+    });
+    if (!resp.ok) {
+      var tip = document.createElement('span');
+      tip.textContent = '错误 ' + resp.status;
+      tip.style.cssText = 'font-size:10px;color:#ef4444;margin-left:4px';
+      btn.parentNode.appendChild(tip);
+      setTimeout(function(){ tip.remove(); }, 2000);
+      return;
+    }
+    var d = await resp.json();
+    if (d.action === 'liked') { btn.classList.add('liked'); btn.innerHTML = likeOn; }
+    else { btn.classList.remove('liked'); btn.innerHTML = likeUn; }
+    var cc = document.getElementById('curated-count');
+    if(cc && d.total !== undefined) cc.textContent = d.total;
+    var tip = document.createElement('span');
+    tip.textContent = d.action === 'liked' ? '✓已赞' : '已取消';
+    tip.style.cssText = 'font-size:10px;color:var(--text3);margin-left:4px';
+    btn.parentNode.appendChild(tip);
+    setTimeout(function(){ tip.remove(); }, 1500);
+  } catch(e) {
+    var tip = document.createElement('span');
+    tip.textContent = '失败';
+    tip.style.cssText = 'font-size:10px;color:#ef4444;margin-left:4px';
+    btn.parentNode.appendChild(tip);
+    setTimeout(function(){ tip.remove(); }, 2000);
+  }
+});
+</script>
+</body>
+</html>
