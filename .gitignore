@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Environment
+.env
+venv/
+.venv/
+
+# Chroma 向量数据库（机器相关，重建即可）
+data/chroma/
+
+# Books 源文件（体积大）
+books/*.epub
+books/*.pdf
+books/*.mobi
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Temp
+temp.html
